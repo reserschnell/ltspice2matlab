@@ -528,10 +528,35 @@ function raw_data = LTspice2Matlab( filename, varargin )
                 raw_data.num_steps = num_steps;
                 % Reshape value matrix and time/source vector
                 mat_size = size(raw_data.variable_mat);
-                raw_data.variable_mat = reshape(raw_data.variable_mat, mat_size(1), mat_size(2) / num_steps, num_steps);
-                raw_data.time_vect = reshape(raw_data.time_vect, mat_size(2) / num_steps, num_steps).';
-                % Update num_data_pnts
-                raw_data.num_data_pnts = mat_size(2) / num_steps;
+                len_steps = diff([find(raw_data.time_vect == raw_data.time_vect(1)), length(raw_data.time_vect)]);
+                if all(diff(len_steps)==0)
+                    raw_data.variable_mat = reshape(raw_data.variable_mat, mat_size(1), mat_size(2) / num_steps, num_steps);
+                    raw_data.time_vect = reshape(raw_data.time_vect, mat_size(2) / num_steps, num_steps).';
+                    % Update num_data_pnts
+                    raw_data.num_data_pnts = mat_size(2) / num_steps;
+                else
+                    time_vec_end = max(raw_data.time_vect);
+                    sample_time = (time_vec_end-raw_data.time_vect(1))/max(len_steps);
+                    
+                    time_vect = raw_data.time_vect(1):sample_time:time_vec_end;
+                    variable_mat = zeros(mat_size(1), length(time_vect), num_steps);
+                    end_last_step = 0;
+                    for i = 1:num_steps
+                        len_step = len_steps(i);
+                        end_step = end_last_step + len_step;
+                        index = (end_last_step+1):end_step;
+                        x = raw_data.variable_mat(:, index);
+                        tx = raw_data.time_vect(index);
+                        
+                        variable_mat(:, :, i) = interp1(tx', x', time_vect')';
+
+                        end_last_step = end_step;
+                    end
+                    
+                    raw_data.variable_mat = variable_mat;
+                    raw_data.time_vect = repmat(time_vect, num_steps, 1);
+                    raw_data.num_data_pnts = length(time_vect);
+                end
             end
 
             % Rename time_vect and add source name for .dc simulations
